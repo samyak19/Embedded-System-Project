@@ -1,0 +1,384 @@
+#include "mbed.h"
+#include "QEI.h"
+//#include "OneWire_Methods.h"
+//#include "ds2781.h"
+
+float base_pwm=0.0;
+ 
+PwmOut speed1(PC_6);
+PwmOut speed2(PA_15);
+DigitalOut enable(PC_13);
+DigitalOut polar1(PC_15);
+DigitalOut direction1(PC_11);
+DigitalOut polar2(PA_14);
+DigitalOut direction2(PC_1);
+
+Ticker o;
+
+Timer t;
+//Encoders
+QEI wheel1 (PA_0, PA_1, NC, 512);
+QEI wheel2 (PA_7, PA_6, NC, 512);
+//Encoders
+
+Serial hm10(PA_11, PA_12);
+//Serial lcd(USBTX,USBRX);
+     uint8_t my_command_length=5;
+     uint8_t v=0;
+     char hm10_receive_buffer[5];
+
+//class battery_monitor{
+//    private:
+//    DigitalInOut   onewire;
+//    int VoltageReading;
+//    int CurrentReading;
+//    float Voltage;
+//    float Current;
+//    Ticker T;
+//    
+//    public:
+//    battery_monitor(PinName p):onewire(p){
+//         VoltageReading=0; 
+//         CurrentReading=0;
+//         Voltage=0.0;
+//         Current=0.0;
+//    T.attach(callback(this,&battery_monitor::monitor),0.1);
+//    }
+//    
+//    void monitor(){
+//         VoltageReading = ReadVoltage();
+//      Voltage = VoltageReading*0.00976; //Returns the voltage measured at the VIN input of the DS2781      *
+////*                                      //in units of 9.76mV 
+//      CurrentReading = ReadCurrent();
+//      Current = CurrentReading/6400.0;
+//      }
+//    
+//    float GetVoltage() {return Voltage;}
+//    float GetCurrent() {return Current;}
+//    
+    
+    
+  // }; 
+    
+    
+    
+class sensor_out {  
+           private:         
+                    AnalogIn R1;
+                    DigitalOut led1;                   
+                    AnalogIn R2;
+                    DigitalOut led2;                   
+                    AnalogIn R3;
+                    DigitalOut led3;                                      
+                    AnalogIn R4;
+                    DigitalOut led4;                 
+                    AnalogIn R5;
+                    DigitalOut led5;
+                    AnalogIn R6;
+                    DigitalOut led6;
+                    int Tick_counts;
+                   float a,b,c,d,e,f,g,h,i,j,k,l,s1,s2,s3,s4,s5,s6,t1,t2,t3,t4,t5,t6,pos,t_sum,ticks_off_line,find_line;
+            public:
+                    float ten_pos;
+                    sensor_out( PinName p1,PinName p2,PinName p3,PinName p4,PinName p5,PinName p6,PinName p7,PinName p8,PinName p9,PinName p10,PinName p11,PinName p12): R1(p1), R2(p2), R3(p3),R4(p4),R5(p5),R6(p6),led1(p7),led2(p8),led3(p9),led4(p10),led5(p11),led6(p12)
+                            {   led1=0;
+                                led2=0;
+                                led3=0;
+                                led4=0;
+                                led5=0;
+                                led6=0;
+                                Tick_counts=0;
+                                ten_pos=0;
+                                a=0;b=0;c=0;d=0;e=0;f=0;g=0;h=0;i=0;j=0;k=0;l=0;s1=0;s2=0;s3=0;s4=0;s5=0;s6=0;t1=0;t2=0;t3=0;t4=0;t5=0;t6=0;pos=0;
+                            }
+                                
+                    
+                    void sensor_in_on(void)
+                    {   led1=1;
+                        led2=1;
+                        led3=1;
+                        led4=1;
+                        led5=1;
+                        led6=1;
+                        wait(0.0001);
+                        a=R1.read()*100.0f ;
+                        c=R2.read()*100.0f ;
+                        e=R3.read()*100.0f ;
+                        g=R4.read()*100.0f ;
+                        i=R5.read()*100.0f ;
+                        k=R6.read()*100.0f ;
+                    }
+                    void sensor_in_off(void)
+                    {   led1=0;
+                        led2=0;
+                        led3=0;
+                        led4=0;
+                        led5=0;
+                        led6=0;
+                        wait(0.0001);
+                         b=R1.read()*100.0f ;
+                        d=R2.read()*100.0f ;
+                        f=R3.read()*100.0f ;
+                        h=R4.read()*100.0f ;
+                        j=R5.read()*100.0f ;
+                        l=R6.read()*100.0f ;
+                    }
+                    void sensor_noise(void)
+                    {   s1=(a-b)+1;
+                        s2=(c-d)-2 ;   
+                        s3=(e-f);
+                        s4=(g-h);
+                        s5=(i-j);
+                        s6=(k-l);
+                    }    
+                    void sensor_average(void)
+                    {   
+                        sensor_in_on();
+                        sensor_in_off();
+                        sensor_noise();
+                        t1+=s1;t2+=s2;t3+=s3;t4+=s4;t5+=s5;t6+=s6;
+                      //  sensor_in_on();
+                       // sensor_in_off();
+                      //  sensor_noise();
+                      //  t1+=s1;t2+=s2;t3+=s3;t4+=s4;t5+=s5;t6+=s6;
+                      //  t1/=2;t2/=2;t3/=2;t4/=2;t5/=2;t6/=2;
+                    }
+                     int sensor_black_check(void){
+                        if(t_sum<70){
+                            ticks_off_line += 1; 
+                            if(ticks_off_line < 100) {return 1;}
+                            else{return 3;}
+                        }
+                        else {
+                            ticks_off_line = 0;
+                            return 0;
+                        }
+                    }
+                      int sensor_find_line(void){
+                        if(find_line<40) return 1;
+                        else return 0;
+                    }                   
+                     int position(void){
+                        sensor_average();
+                        pos= (1000* ((0*t1+1*t2+2*t3+3*t4+4*t5+5*t6)/(t1+t2+t3+t4+t5+t6)));
+                        t_sum=t1+t2+t3+t4+t5+t6;
+                            
+                        if (Tick_counts%10 == 0){
+                            if(t_sum>70) ten_pos=pos-2500.0f;
+                            }Tick_counts++;
+                        
+                        find_line=t3+t4;
+                        t1=0;t2=0;t3=0;t4=0;t5=0;t6=0;
+                        return pos;
+                    }   
+                    };
+                    sensor_out* S1 = new sensor_out(PC_2,PC_3,PC_4,PB_1,PC_5,PC_0,PC_10,PB_2,PB_0,PA_4,PA_13,PC_12);
+        
+class PID_sensor {
+            private:
+                    int past,position,sum;
+                   float error;
+                    float kp,ki,kd, out;
+            public:
+                    PID_sensor( float a, float b, float c) : kp(a), ki(b),kd(c) 
+                    { past=0; position=0; sum=0; error=0;}
+                    
+                    
+                    
+                    void algorithm(void)
+                    {   error= position-2500;
+                        if (50 > error > -50) sum=0;
+                        sum+=error;  
+                        out= kp*error +kd *(error-past)+ki*sum;
+                        past=error;
+                    }
+                    float PID_sensor_out(int p)
+                    {   position=p;
+                        algorithm();
+                        //lcd.printf("z %.3f\n", out );
+                        return out;
+                    }
+                 };
+                 
+
+class speed {
+        private:
+                Ticker m;
+                  float p;
+                  float q;
+                  float u;
+                  float y;
+                  float z;
+                  float x;
+                  float s1,s2;
+
+        public:
+                speed(){
+                           m.attach(callback(this,&speed::regain_speed),0.09);
+                           p=0;q=0;u=0;y=0;z=0;x=0;
+                        }
+
+              void toggle(void){
+                    u=wheel1.getPulses();
+                    y=wheel2.getPulses();
+                    z=(u-p)*0.18f;     //  cm/s      0.85*10*2*3.1415*0.05333*3.25/512
+                    x=(y-q)*0.18f; 
+
+                    p=u;
+                    q=y;
+                }
+            
+            void regain_speed(){
+                       toggle();
+                       if (enable==1){
+                          if(z<30 and x<30 ){
+                                base_pwm=0.0f;
+                            }
+                            if (z>42 and x>42){  
+                                base_pwm+=0.13f;     
+                            }
+                        
+                        }             
+                       }
+            
+                float leftspeed()  {return z;}
+                float rightspeed()  {return x;}
+             
+
+            };
+            
+              
+class Turning_around  {
+    private:
+     //uint8_t my_command_length;
+//     uint8_t i;
+  //   char hm10_receive_buffer[5];
+    //int past;
+     //Ticker o;
+    float position;
+    
+    public:
+    Turning_around(){ 
+//        my_command_length = 5;
+//        i=0;
+      //  past=0;
+        o.attach(callback(this,&Turning_around::turning),0.0001);
+
+        }
+        
+     void  turning() {
+         if(hm10.readable()){
+    while(v < my_command_length){
+      hm10_receive_buffer[v++] = hm10.getc();
+   }  bluetooth();
+    }}
+
+    void bluetooth(){
+     v = 0;
+
+    if(strcmp(hm10_receive_buffer, "12345") == 0){
+        //
+  // past=wheel1.getPulses();
+
+       enable=1;
+       polar2=0;
+       direction2=1;
+       
+       speed2.period(0.001f);// 1 s period
+       speed2.write(0.5f);
+       
+       polar1=0;
+       direction1=0;
+       speed1.period(0.001f);
+       speed1.write(0.5f);
+       wait(0.75);
+       S1->position();
+       while(S1->sensor_find_line()){S1->position();}
+       // 1 s period
+     //  while(wheel1.getPulses()<  (past+710)){}
+       
+       direction2=0;
+       enable=0;
+       
+        memset(hm10_receive_buffer, 0, 5);
+              }
+            //       wait(0.3);
+       } //if(hm10.readable()) 
+//          o.attach(callback(this,&Turning_around::turning),0.01);
+        // function
+ };       
+ 
+     
+
+int main() 
+        {
+        PID_sensor* PID1 = new PID_sensor(0.7f,0.02f,0.1f);
+        speed* SPEED1=new speed;
+        hm10.baud(9600);
+        Turning_around turn;
+        int po;
+        int Stop_check = 0;
+        
+        float outt;
+        while(1){                    
+                po=S1->position();
+                outt=PID1->PID_sensor_out(po);
+                 if(S1->sensor_black_check() == 3){
+                    if(S1->ten_pos<0){
+                            enable=1;
+                            polar2=0;
+                            direction2=1;
+                            speed2.period(0.001f);// 1 s period
+                            speed2.write(0.2f);       
+                            polar1=0;
+                            direction1=0;
+                            speed1.period(0.001f);
+                            speed1.write(0.2f);    
+                            S1->position();
+                            while(S1->sensor_find_line()){S1->position();}
+       
+                            direction2=0;
+                            enable=0;
+                            
+                    }
+                    else if(S1->ten_pos>0){  
+                            enable=1;
+                            polar2=0;
+                            direction2=0;
+                            speed2.period(0.001f);// 1 s period
+                            speed2.write(0.2f);       
+                            polar1=0;
+                            direction1=1;
+                            speed1.period(0.001f);
+                            speed1.write(0.2f);    
+                            S1->position();
+                            while(S1->sensor_find_line()){S1->position();}
+       
+                            direction1=0;
+                            enable=0;
+                            
+                    }
+                }
+                
+                else {  
+                            enable=1;                                
+                            polar1=0;
+                            direction1=0;        
+                            speed1.period(0.001f);
+                            polar2=0;
+                            direction2=0;        
+                            speed2.period(0.001f);// 1 s period
+                            if(base_pwm < 0 )base_pwm =0.0f;
+                            
+                            Stop_check=0;
+                        
+                            speed1.write(base_pwm+outt/1000.0f);
+                            speed2.write(base_pwm-outt/1000.0f);
+                            
+                }
+        }
+}
+          
+
+
+
